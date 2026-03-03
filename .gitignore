@@ -11,3 +11,4 @@ __pycache__/
 # Jupyter
 .ipynb_checkpoints/
 
+dataset/raw/Chicago_Vacant_Land_Parcels.xlsx
