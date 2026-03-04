@@ -50,23 +50,27 @@ def load_debt_by_ward():
 
 @st.cache_data
 def load_demolitions_by_ward():
-    try:
-        demo = pd.read_csv(BASE / "dataset" / "raw" / "demolition_clean.csv")
-        zip_ward = pd.read_csv(BASE / "dataset" / "cleaned" / "zip_ward_lookup.csv")
-        zip_ward["ZIP5"] = zip_ward["ZIP5"].astype(str).str[:5]
-        zip_cols = [f"CONTACT_{i}_ZIPCODE" for i in range(1, 4) if f"CONTACT_{i}_ZIPCODE" in demo.columns]
-        if not zip_cols:
-            return pd.DataFrame(columns=["ward", "total_demolitions", "city_initiated"])
-        demo["ZIP5"] = demo[zip_cols].bfill(axis=1).iloc[:, 0].astype(str).str[:5]
-        demo = demo.merge(zip_ward, on="ZIP5", how="left")
-        demo = demo.dropna(subset=["ward"])
-        demo["ward"] = demo["ward"].astype(int)
-        return demo.groupby("ward").agg(
+    # Try pre-aggregated summary first, fall back to full geocoded file
+    summary_path = BASE / "dataset" / "cleaned" / "ward_demolition_summary.csv"
+    detail_path  = BASE / "dataset" / "cleaned" / "demolition_with_ward.csv"
+
+    if summary_path.exists():
+        demo = pd.read_csv(summary_path)
+    elif detail_path.exists():
+        raw = pd.read_csv(detail_path)
+        raw["is_city_initiated"] = raw["is_city_initiated"].astype(str).str.upper() == "TRUE"
+        demo = raw.groupby("ward").agg(
             total_demolitions=("PERMIT#", "count"),
             city_initiated=("is_city_initiated", "sum")
         ).reset_index()
-    except Exception:
+    else:
+        st.warning("Missing demolition data — add ward_demolition_summary.csv or demolition_with_ward.csv to dataset/cleaned/")
         return pd.DataFrame(columns=["ward", "total_demolitions", "city_initiated"])
+
+    demo["ward"]              = demo["ward"].astype(int)
+    demo["city_initiated"]    = demo["city_initiated"].astype(int)
+    demo["total_demolitions"] = demo["total_demolitions"].astype(int)
+    return demo[["ward", "total_demolitions", "city_initiated"]]
 
 # -----------------------------
 # LOAD DATA
@@ -85,6 +89,22 @@ else:
 
 gdf["total_debt_m"]      = gdf["total_debt_m"].fillna(0)
 gdf["total_demolitions"] = gdf["total_demolitions"].fillna(0)
+
+# Recompute Housing Distress Index with debt as third component
+def normalize(s):
+    mn, mx = s.min(), s.max()
+    return (s - mn) / (mx - mn) if mx > mn else s * 0
+
+gdf["housing_distress_index"] = (
+    normalize(gdf["foreclosure_rate_2024"]) +
+    normalize(gdf["vacant_count"]) +
+    normalize(gdf["total_debt_m"])
+) / 3
+
+gdf["risk_tier"] = pd.qcut(
+    gdf["housing_distress_index"], q=3,
+    labels=["Low", "Watch", "Critical"]
+)
 
 gdf = gdf.rename(columns={
     "foreclosure_rate_2024":  "Foreclosures (2024)",
