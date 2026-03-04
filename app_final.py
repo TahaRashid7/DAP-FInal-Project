@@ -81,13 +81,27 @@ ts = load_foreclosures_timeseries()
 debt_long, ward_debt_totals = load_debt_by_ward()
 ward_demo = load_demolitions_by_ward()
 
+# -- WATER DEBT CALCULATION --
+water_categories = ["Water (Service)", "Water Penalty", "Water Tax (Service)", "Water Tax Penalty"]
+water_debt = (
+    debt_long[debt_long["category"].isin(water_categories)]
+    .groupby("ward")["amount_m"]
+    .sum()
+    .reset_index()
+    .rename(columns={"amount_m": "Water Debt ($M)"})
+)
+
+# -- MERGE DATA --
 gdf = gdf.merge(ward_debt_totals, on="ward", how="left")
+gdf = gdf.merge(water_debt, on="ward", how="left")
+
 if not ward_demo.empty:
     gdf = gdf.merge(ward_demo[["ward", "total_demolitions"]], on="ward", how="left")
 else:
     gdf["total_demolitions"] = 0
 
-gdf["total_debt_m"]      = gdf["total_debt_m"].fillna(0)
+gdf["total_debt_m"]    = gdf["total_debt_m"].fillna(0)
+gdf["Water Debt ($M)"] = gdf["Water Debt ($M)"].fillna(0) 
 gdf["total_demolitions"] = gdf["total_demolitions"].fillna(0)
 
 # Recompute Housing Distress Index with debt as third component
@@ -132,6 +146,7 @@ map_metric = st.sidebar.radio(
         "Foreclosures (2024)",
         "Vacant parcels",
         "Outstanding Debt ($M)",
+        "Water Debt ($M)",
         "Demolitions",
         "Risk tier",
         "Housing Distress Index",
@@ -164,16 +179,19 @@ else:
 # -----------------------------
 # MAP
 # -----------------------------
+
 hover_cols = [
     "ward", "Foreclosures (2024)", "Vacant parcels",
-    "Housing Distress Index", "Outstanding Debt ($M)", "Demolitions", "risk_tier"
+    "Housing Distress Index", "Outstanding Debt ($M)", 
+    "Water Debt ($M)", "Demolitions", "risk_tier" 
 ]
 
 color_scales = {
     "Foreclosures (2024)":    "Reds",
     "Vacant parcels":         "Blues",
-    "Housing Distress Index":  "Purples",
+    "Housing Distress Index": "Purples",
     "Outstanding Debt ($M)":  "Oranges",
+    "Water Debt ($M)":        "GnBu",
     "Demolitions":            "YlOrRd"
 }
 
