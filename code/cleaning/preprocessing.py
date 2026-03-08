@@ -1,0 +1,74 @@
+import pandas as pd
+import requests
+from bs4 import BeautifulSoup
+import geopandas as gpd
+from pathlib import Path
+
+#Making reproducible data paths
+base_dir = Path.cwd().parents[1]
+cleaned_dir = base_dir / "dataset" / "cleaned"
+raw_dir = base_dir / "dataset" / "raw"
+cleaned_dir.mkdir(parents=True, exist_ok=True)
+
+
+##VACANT LAND DATASET
+
+## TK: Code for how the vacant land dataset was subsetted from the parcel dataset ##
+
+
+##FORECLOSURE DATASET
+url = "https://www.housingstudies.org/data-portal/browse/?indicator=foreclosures-100-residential-parcel&area=chicago-wards&property_type=0&view_as=view-table"
+response = requests.get(url)
+soup = BeautifulSoup(response.text, "lxml")
+table = soup.find("table", id="focus")
+df_foreclosure = pd.read_html(str(table))[0]
+df_foreclosure.to_csv(cleaned_dir / "foreclosure.csv", index=False)
+
+#MERGED DATASET OF VACANT LAND AND FORECLOSURE
+#Loading data
+df_vacant = pd.read_excel(raw_dir/ "vacant_land.xlsx")
+df_foreclosure = pd.read_csv(cleaned_dir / "foreclosure.csv")
+ward_gdf = gpd.read_file(raw_dir/ "wards_shapefile.csv")
+
+#Converting the vacant land data to ward level
+df_vacant_wardlvl = df_vacant.groupby("ward_num").size().reset_index(name="vacant_land")
+assert df_vacant_wardlvl.isna().sum().sum() == 0
+
+#Changing the ward names in the foreclosure data
+df_foreclosure = df_foreclosure.rename(columns={"Geography" : "ward_num"})
+df_foreclosure = df_foreclosure[df_foreclosure["ward_num"] != "Chicago Total"]
+df_foreclosure["ward_num"] = df_foreclosure["ward_num"].str.replace("Ward", "", regex=False).str.strip().astype(int)
+
+#Merging the foreclosure data with vacant land data
+combined_data = df_foreclosure.merge(df_vacant_wardlvl, on="ward_num", how ="left")
+combined_data.columns
+
+#Cleaning the combined dataset
+year_cols = ['2005', '2006', '2007', '2008', '2009', '2010', '2011', '2012', '2013', '2014', '2015', '2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024']
+for year in year_cols:
+    combined_data = combined_data.rename(columns={year: f"foreclosure_{year}"})
+
+#Merging the combined dataset with ward shapefile
+assert ward_gdf["Ward"].nunique() == 50
+assert ward_gdf["Ward"].isna().sum() == 0
+
+ward_gdf = ward_gdf.rename(columns={"Ward" : "ward_num"})
+ward_gdf["ward_num"] = ward_gdf["ward_num"].astype(int) 
+combined_gdf= ward_gdf.merge(combined_data, on="ward_num", how="left")
+cols_to_drop = ["objectid", "edit_date", "ward_id", "globalid"]
+combined_gdf = combined_gdf.drop(columns=[c for c in cols_to_drop if c in combined_gdf.columns])
+
+combined_gdf.to_csv(cleaned_dir / "Merged_data.csv", index=False)
+
+##DEBT DATASET
+
+## TK: Code for how the debt data was subsetted from the bigger debt dataset ##
+## TK: Code for how the debt data was converted to ward level ##
+
+##DEMOLITION DATASET
+
+## TK: Code for how the demolition data was subsetted from the bigger  dataset ##
+## TK: Code for how the demolition data was converted to ward level ##
+
+
+
