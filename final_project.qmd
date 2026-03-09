@@ -51,12 +51,14 @@ Using a scripted web request, we scraped the ward-level foreclosure table from t
 ***Outstanding Utility Debt (365+ Days Overdue):***
 
 Outstanding utility debt reflects the accumulating financial distress. The data was taken from the parcel-level data shared by the Department of Finance at the Chicago Mayor’s Office, covering unpaid water, sewer, garbage, and tax balances plus itemized penalties.
-TAHA ADD HOW U CLEANED DATA
+
+The raw dataset contained 143,000+ parcel-level accounts but included no ward identifiers, only ZIP codes. Since ZIP code boundaries do not align with ward boundaries, a direct lookup was insufficient. Instead, we built a ZIP-to-ward crosswalk by spatially intersecting Chicago ZIP code and ward boundary polygons. Accounts in ZIPs spanning multiple wards were proportionally allocated using each ward's share of the ZIP area. Balances across eleven categories — water, sewer, garbage, taxes, and itemized penalties — were then aggregated to the ward level.
 
 ***Demolition Lien Records:***
 
- Demolition Lien Records reflects  structural failure. This data was taken from the City of Chicago Data Portal Building Permits dataset. We geocoded over 21000 permits to the ward level and distinguished city-initiated demolitions from private-demolitions for a clearer pricture.
- TAHA ADD HOW U CLEANED DATA
+Demolition Lien Records reflects  structural failure. This data was taken from the City of Chicago Data Portal Building Permits dataset. We geocoded over 21000 permits to the ward level and distinguished city-initiated demolitions from private-demolitions for a clearer pricture.
+
+The raw permits dataset contained all building permit types with no ward identifiers, only street addresses. We first filtered to demolition permits using the permit type field, then geocoded each address via the U.S. Census Geocoder API to obtain coordinates, since ward assignment requires spatial rather than tabular matching. These coordinates were converted into point geometries and spatially joined to Chicago ward boundary polygons using GeoPandas, assigning each permit to its corresponding ward before aggregating to ward-level counts.
  
  
 ***Vacant Land***
