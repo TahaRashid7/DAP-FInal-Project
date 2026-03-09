@@ -2,7 +2,7 @@
 title: "The Cycle of Disinvestment: Turning Property Distress into Policy Opportunity"
 format:
   html: default
-  pdf: default
+  pdf: 
     include-in-header:
       text: |
         % Enable wrapping for Pandoc code blocks in PDF
@@ -16,7 +16,6 @@ execute-dir: project
 execute: 
     echo: false
 ---
-
 **Group Members, Lecture Section, GitHub Usernames:** 
 
 Aishani Mathur, M/W 10:30, aishanimathur
