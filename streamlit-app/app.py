@@ -5,8 +5,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
 
-import pyogrio
-gpd.options.io_engine = "pyogrio"
 
 st.set_page_config(layout="wide")
 st.title("Chicago Housing Distress Dashboard (2026)")
